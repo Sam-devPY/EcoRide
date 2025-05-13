@@ -1,0 +1,39 @@
+<?php
+session_start();
+require 'db.php';
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: connexion.php');
+    exit;
+}
+
+$covoiturage_id = $_POST['covoiturage_id'] ?? null;
+
+if ($covoiturage_id) {
+    // Mettre à jour le statut du covoiturage
+    $query = $pdo->prepare("
+        UPDATE covoiturage 
+        SET statut = 'termine', date_arrivee = NOW() 
+        WHERE covoiturage_id = :covoiturage_id AND statut = 'en_cours'
+    ");
+    $query->execute([':covoiturage_id' => $covoiturage_id]);
+
+    // Récupérer les emails des participants
+    $participantsQuery = $pdo->prepare("
+        SELECT u.email
+        FROM participe p
+        JOIN utilisateur u ON p.utilisateur_id = u.utilisateur_id
+        WHERE p.covoiturage_id = :covoiturage_id
+    ");
+    $participantsQuery->execute([':covoiturage_id' => $covoiturage_id]);
+    $participants = $participantsQuery->fetchAll(PDO::FETCH_ASSOC);
+
+    // Envoyer un email aux participants
+    foreach ($participants as $participant) {
+        mail($participant['email'], 'Covoiturage terminé', 'Veuillez valider votre trajet dans votre espace.');
+    }
+}
+
+header('Location: profil.php');
+exit;
+?>
